@@ -1,18 +1,102 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel,QLineEdit,QPushButton,QVBoxLayout,QWidget,QInputDialog
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel,QLineEdit,QPushButton,QVBoxLayout,QWidget,QInputDialog,QComboBox,QDialog,QListWidget
 from User import User
+import csv
+from Item import Item
+from datetime import datetime, timedelta
+
+
+class CheckoutWindow(QDialog):
+    def __init__(self, items, user):
+        super().__init__()
+        self.items = items
+        self.user = user
+        layout = QVBoxLayout()
+
+        # Item selection combo box
+        self.item_combo_box = QComboBox()
+        for item in items:
+            if item.status == "available": # Only list available items
+                self.item_combo_box.addItem(item.title)
+        layout.addWidget(self.item_combo_box)
+
+        # User selection combo box
+        
+        # Checkout button
+        self.checkout_button = QPushButton("Checkout")
+        self.checkout_button.clicked.connect(self.checkout_item)
+        layout.addWidget(self.checkout_button)
+
+        self.setLayout(layout)
+
+    def checkout_item(self):
+        selected_title = self.item_combo_box.currentText()
+        selected_user = self.user
+        for item in self.items:
+            if item.title == selected_title:
+                print(f"Attempting to check out {selected_title}...") # Debug print
+                if item.status == "available":
+                    print("Item is available.") # Debug print
+                else:
+                    print("Item is not available.") # Debug print
+                if selected_user.checkout_item(item):
+                    print(f"{selected_title} has been checked out.")
+                    self.update_csv()
+                    item.status = "unavailable"
+                else:
+                    print("User unable to check out item.") # Debug print
+                    print(f"An error occurred while checking out {selected_title}.")
+                break
+
+
+    
+
+
+    def update_csv(self):
+        with open('libraryitems.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            for item in self.items:
+                # Assuming the attributes are structured this way; modify as needed
+                writer.writerow([item.title, item.type, item.status, item.get_due_date(), item.checkout_period, item.value])
 
 class ViewUsersWindow(QMainWindow):
-    def __init__(self, users):
-        super().__init__()
+    def __init__(self, users, library_app, parent=None):
+        super().__init__(parent)
+        self.users = users
+        self.library_app = library_app
+        self.parent = parent
         self.setWindowTitle("View Users")
         layout = QVBoxLayout()
-        for user in users.values():
-            layout.addWidget(QLabel(str(user)))
+
+        self.user_list_widget = QListWidget(self)
+        for user_id, user in users.items():
+            self.user_list_widget.addItem(str(user))
+        layout.addWidget(self.user_list_widget)
+
+        # Add a button to allow selection of a user
+        self.select_user_button = QPushButton("Select User", self)
+        self.select_user_button.clicked.connect(self.select_user)
+        layout.addWidget(self.select_user_button)
+
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
 
+    def select_user(self):
+        selected_user_text = self.user_list_widget.currentItem().text()
+        selected_user_id = None
+        for user_id, user in self.users.items():
+            if str(user) == selected_user_text:
+                selected_user_id = user_id
+                break
+
+        if selected_user_id is not None:
+            self.library_app.select_user(selected_user_id)
+        else:
+            print(f"Error: Could not find selected user.")
+        self.close()
+
+    
 class EditUserWindow(QMainWindow):
     def __init__(self, users):
         super().__init__()
@@ -70,30 +154,34 @@ class RegistrationWindow(QMainWindow):
         address = self.address_input.text()
         phone_number = self.phone_number_input.text()
         library_card_number = self.library_card_number_input.text()
-        age = int(self.age_input.text()) # Assuming there's a field where users enter their age
+        age = int(self.age_input.text())  # Assuming there's a field where users enter their age
         password = self.password_input.text()
 
         user = User.register(name, address, phone_number, library_card_number, age)
-        
+
         # Add the user to a dictionary or other data structure
         self.main_app.users[library_card_number] = user
         self.main_app.passwords[library_card_number] = password
 
         print(f"User {name} registered with library card number {library_card_number}")
-        self.close()
 
+        # Save the updated users to the CSV file
+        self.main_app.save_users_to_csv()
+
+        self.close()
 
 
 
 class LoginWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        
         self.setWindowTitle("Library System Login")
         self.setGeometry(100, 100, 300, 200)
 
         
 
-        self.library_card_number_input = QLineEdit(self)
+        self.Employee_ID_number_input = QLineEdit(self)
         self.login_button = QPushButton("Login", self)
         self.login_button.clicked.connect(self.attempt_login)
 
@@ -101,8 +189,8 @@ class LoginWindow(QMainWindow):
         self.password_input.setEchoMode(QLineEdit.Password)  # Hide the password text
 
         layout = QVBoxLayout()
-        layout.addWidget(QLabel("Enter Library Card Number:"))
-        layout.addWidget(self.library_card_number_input)
+        layout.addWidget(QLabel("Enter Employee ID:"))
+        layout.addWidget(self.Employee_ID_number_input)
         
 
         layout.addWidget(QLabel("Enter Password:"))
@@ -119,7 +207,7 @@ class LoginWindow(QMainWindow):
 
 
     def attempt_login(self):
-        library_card_number = self.library_card_number_input.text()
+        employeeId = self.Employee_ID_number_input.text() # Fix the variable name here
         password = self.password_input.text()
 
         # Example list of valid credentials
@@ -127,22 +215,22 @@ class LoginWindow(QMainWindow):
             "12345": "password",
             "67890": "password"
         }
-        if library_card_number in valid_credentials and valid_credentials[library_card_number] == password:
-            self.accept_login(library_card_number)
+        if employeeId in valid_credentials and valid_credentials[employeeId] == password:
+            self.accept_login(employeeId)
         else:
-            print("Invalid library card number or password")
+            print("Employee ID number or password")
 
-    def accept_login(self, library_card_number):
-        print(f"Logged in with library card number: {library_card_number}")
-        self.main_window = LibraryApp(library_card_number)  # Create the main window
+    def accept_login(self,employeeId):
+        print(f"Logged in with Employee Id: {employeeId}")
+        self.main_window = LibraryApp(employeeId)  # Create the main window
         self.main_window.show()
         self.close()
 
 
 class LibraryApp(QMainWindow):
-    def __init__(self,library_card_number):
+    def __init__(self,employeeId):
         super().__init__()
-        self.library_card_number = library_card_number
+        self.employeeId = employeeId
         # Set window properties
         self.setWindowTitle("Library System")
         self.setGeometry(100, 100, 800, 600)
@@ -152,18 +240,43 @@ class LibraryApp(QMainWindow):
         label.move(200, 250)
         label.move(150, 50) # Adjusted x coordinate for centering
         label.setFixedWidth(500) # Set fixed width to fit the text
-
+        self.library_card_number = None
         self.users = {}
         self.passwords = {}
         self.transactions = []
+        self.items = []
 
-        self.user = self.users.get(library_card_number)  # Get the current user
+        self.checkout_window = CheckoutWindow(self.items, self.users)
+
+
+        with open('users.csv', newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            next(reader)
+            for row in reader:
+                name, address, phone_number, library_card_number, age, password = row
+                user = User.register(name, address, phone_number, library_card_number, int(age))
+                self.users[library_card_number] = user
+                self.passwords[library_card_number] = password
+
+
+        with open('libraryitems.csv', newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            next(reader)
+            for row in reader:
+                print("Processing row:", row)  # Debug print statement
+                checkout_period_str = row[4]
+                checkout_period_weeks = int(checkout_period_str.split()[0])  # Extract the number of weeks
+                item = Item(row[0], row[1], row[2], row[3], checkout_period_weeks, float(row[5]))
+                self.items.append(item)
+
+
+        self.user = self.users.get(self.library_card_number) if self.library_card_number else None
         if self.user is not None:
             self.fines_label = QLabel(f"Current fines: ${self.user.fines:.2f}")  # Display fines
             layout.addWidget(self.fines_label)
         else:
             # Handle the case where the user is not found
-            print(f"Error: User with library card number {library_card_number} not found.")
+            print(f"Error: User with library card number {self.library_card_number} not found.")
             # You might want to redirect the user back to the login page or show an error message
         
         
@@ -177,6 +290,8 @@ class LibraryApp(QMainWindow):
         self.edit_user_button.clicked.connect(self.open_edit_user_window)
         self.delete_user_button = QPushButton("Delete User", self)
         self.delete_user_button.clicked.connect(self.open_delete_user_window)
+        self.checkout_button = QPushButton("Checkout Item", self)
+        self.checkout_button.clicked.connect(self.open_checkout_window)
 
         
         layout.addWidget(self.register_button)
@@ -190,16 +305,27 @@ class LibraryApp(QMainWindow):
         
         layout.addWidget(self.delete_user_button)
 
+        layout.addWidget(self.checkout_button)
+
         container = QWidget()  # Create a container widget
         container.setLayout(layout)  # Set the layout of the container widget
         self.setCentralWidget(container)  # Set the central widget of the main window
 
         self.show()
 
-    
+    def select_user(self, user_id):
+        self.user = self.users.get(user_id)
+        if self.user:
+            print(f"Selected user with library card number {user_id}")
+        else:
+            print(f"Error: User with library card number {user_id} not found.")
+
+    def open_checkout_window(self):
+        self.checkout_window = CheckoutWindow(self.items, self.user)
+        self.checkout_window.show()
 
     def open_view_users_window(self):
-        self.view_users_window = ViewUsersWindow(self.users)
+        self.view_users_window = ViewUsersWindow(self.users,self)
         self.view_users_window.show()
 
     def open_edit_user_window(self):
@@ -232,10 +358,32 @@ class LibraryApp(QMainWindow):
         self.users[library_card_number] = user
         self.passwords[library_card_number] = password
 
+        with open('users.csv', mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([name, address, phone_number, library_card_number, age, password])
+
         print(f"User {name} registered with library card number {library_card_number}")
         self.close()
 
-   
+    def save_users_to_csv(self):
+        with open('users.csv', mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Name', 'Address', 'PhoneNumber', 'LibraryCardNumber', 'Age', 'Password'])  # Write the header
+            for user_id, user in self.users.items():
+                writer.writerow([user.name, user.address, user.phone_number, user_id, user.age, self.passwords[user_id]])
+    def load_users_from_csv(self):
+        try:
+            with open('users.csv', newline='') as csvfile:
+                reader = csv.reader(csvfile)
+                next(reader)  # Skip the header row
+                for row in reader:
+                    name, address, phone_number, library_card_number, age, password = row
+                    user = User.register(name, address, phone_number, library_card_number, int(age))
+                    self.users[library_card_number] = user
+                    self.passwords[library_card_number] = password
+        except FileNotFoundError:
+            print("No users file found. Starting with an empty user list.")
+
 
 
     def add_user(self, user, password):

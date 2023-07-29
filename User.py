@@ -30,12 +30,17 @@ class User:
           # Check if user is a child and has reached the maximum check out limit
         if self.age <= 12 and len(self.checked_out_items) >= 5:
             print(f"Children can check out a maximum of five items. Cannot checkout item: {Item.title}")
-            return
+            return False
         
         if Item.checkout():
+            print(f'attempting to check out item: {Item.title}')
+            
             self.checked_out_items.append(Item)
+            return True
+
         else:
             print(f"Cannot checkout item: {Item.title}")
+            return False
         
 
     
