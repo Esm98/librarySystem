@@ -225,7 +225,7 @@ class LibraryApp(QMainWindow):
 
         # You'll probably want to add some validation and error handling here
 
-        user = User.register(name, address, phone_number, library_card_number, isAdult)
+        user = User.register(name, address, phone_number, library_card_number, age)
         print(f"Welcome, {user.name}! Your registration is complete.")
 
         # Add the user to a dictionary or other data structure

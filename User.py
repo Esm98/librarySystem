@@ -38,9 +38,7 @@ class User:
             print(f"Cannot checkout item: {Item.title}")
         
 
-    def return_item(self, Item):
-        Item.return_item()
-        self.checked_out_items.remove(Item)
+    
 
     def request_item(self, Item):
         if Item.get_status() == "available":
