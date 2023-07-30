@@ -42,6 +42,7 @@ class CheckoutWindow(QDialog):
                 if selected_user.checkout_item(item):
                     print(f"{selected_title} has been checked out.")
                     self.update_csv()
+                    self.update_users_csv(self.user)
                     item.status = "unavailable"
                 else:
                     print("User unable to check out item.") # Debug print
@@ -58,6 +59,29 @@ class CheckoutWindow(QDialog):
             for item in self.items:
                 # Assuming the attributes are structured this way; modify as needed
                 writer.writerow([item.title, item.type, item.status, item.get_due_date(), item.checkout_period, item.value])
+
+    def update_users_csv(self, user):
+        with open('users.csv', 'r', newline='') as csvfile:
+            # Read the existing users
+            reader = csv.reader(csvfile)
+            users = [row for row in reader]
+
+        with open('users.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            # Write headers
+            writer.writerow(['Name', 'Address', 'PhoneNumber', 'LibraryCardNumber', 'Age', 'Password', 'CheckedOutItems'])
+            # Write the existing users
+            for row in users[1:]:
+                if row[3] == str(user.library_card_number):  # Update the user with new checked-out items
+                    checked_out_items_string = user.get_checked_out_items_string()
+                    writer.writerow([row[0], row[1], row[2], row[3], row[4], row[5], checked_out_items_string])
+                else:
+                    writer.writerow(row)
+
+
+
+
+
 
 class ViewUsersWindow(QMainWindow):
     def __init__(self, users, library_app, parent=None):
@@ -85,16 +109,81 @@ class ViewUsersWindow(QMainWindow):
     def select_user(self):
         selected_user_text = self.user_list_widget.currentItem().text()
         selected_user_id = None
+        selected_user = None
         for user_id, user in self.users.items():
             if str(user) == selected_user_text:
                 selected_user_id = user_id
+                selected_user = user
                 break
 
         if selected_user_id is not None:
+            details_window = UserDetailsWindow(selected_user,Item)
+            details_window.exec_()
             self.library_app.select_user(selected_user_id)
         else:
             print(f"Error: Could not find selected user.")
         self.close()
+
+class UserDetailsWindow(QDialog):
+     def __init__(self,user_library_card_number,items,parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("User Details")
+        layout = QVBoxLayout()
+        self.items = items
+        user_library_card_number = self.user_library_card_number
+        user = self.user
+
+        #with open('users.csv', newline='') as csvfile:
+           # reader = csv.reader(csvfile)
+            #next(reader)
+            #for row in reader:
+                #name, address, phone_number, library_card_number, age, checked_out_items_string = row
+                #if library_card_number == user_library_card_number:
+                    #checked_out_titles = checked_out_items_string.split(';')
+                    #checked_out_items = [item for item in items if item.title in checked_out_titles]
+                    #break
+        
+        with open('users.csv', newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            next(reader) # Skip the header
+            for row in reader:
+                name, address, phone_number, library_card_number, age, password, checked_out_items_string = row
+                checked_out_titles = checked_out_items_string.split(';')
+                checked_out_items = [item for item in self.items if item.title in checked_out_titles]
+                user = User.register(name, address, phone_number, library_card_number, int(age))
+                user.checked_out_items = checked_out_items
+                self.users[library_card_number] = user
+                self.passwords[library_card_number] = password
+        
+
+
+
+
+
+        # Name
+        name_label = QLabel(f"Name: {name}")
+        layout.addWidget(name_label)
+
+        # Library Card Number
+        card_number_label = QLabel(f"Library Card Number: {library_card_number}")
+        layout.addWidget(card_number_label)
+
+        # Checked Out Items
+        checked_out_label = QLabel("Checked Out Items:")
+        layout.addWidget(checked_out_label)
+        checked_out_list = QListWidget(self)
+        for item in checked_out_items:
+            checked_out_list.addItem(item.title)
+        layout.addWidget(checked_out_list)
+
+        # OK Button
+        ok_button = QPushButton("OK", self)
+        ok_button.clicked.connect(self.close)
+        layout.addWidget(ok_button)
+
+        self.setLayout(layout)
+
+
 
     
 class EditUserWindow(QMainWindow):
@@ -212,8 +301,8 @@ class LoginWindow(QMainWindow):
 
         # Example list of valid credentials
         valid_credentials = {
-            "12345": "password",
-            "67890": "password"
+            "": "",
+            "": ""
         }
         if employeeId in valid_credentials and valid_credentials[employeeId] == password:
             self.accept_login(employeeId)
@@ -251,12 +340,16 @@ class LibraryApp(QMainWindow):
 
         with open('users.csv', newline='') as csvfile:
             reader = csv.reader(csvfile)
-            next(reader)
+            next(reader) # Skip the header
             for row in reader:
-                name, address, phone_number, library_card_number, age, password = row
+                name, address, phone_number, library_card_number, age, password, checked_out_items_string = row
+                checked_out_titles = checked_out_items_string.split(';')
+                checked_out_items = [item for item in self.items if item.title in checked_out_titles]
                 user = User.register(name, address, phone_number, library_card_number, int(age))
+                user.checked_out_items = checked_out_items
                 self.users[library_card_number] = user
                 self.passwords[library_card_number] = password
+
 
 
         with open('libraryitems.csv', newline='') as csvfile:
@@ -358,9 +451,14 @@ class LibraryApp(QMainWindow):
         self.users[library_card_number] = user
         self.passwords[library_card_number] = password
 
-        with open('users.csv', mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow([name, address, phone_number, library_card_number, age, password])
+        with open('users.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            # Write the header
+            writer.writerow(['Name', 'Address', 'PhoneNumber', 'LibraryCardNumber', 'Age', 'CheckedOutItems'])
+            for user in self.users:
+                checked_out_items_string = user.get_checked_out_items_string()
+                writer.writerow([user.name, user.address, user.phone_number, user.library_card_number, user.age, checked_out_items_string])
+
 
         print(f"User {name} registered with library card number {library_card_number}")
         self.close()
@@ -384,7 +482,7 @@ class LibraryApp(QMainWindow):
         except FileNotFoundError:
             print("No users file found. Starting with an empty user list.")
 
-
+ 
 
     def add_user(self, user, password):
         library_card_number = user.library_card_number

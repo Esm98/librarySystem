@@ -12,6 +12,12 @@ class User:
         self.requested_items = []
 
 
+
+    def get_checked_out_items_string(self):
+        return ';'.join(item.title for item in self.checked_out_items)
+
+
+
     def __str__(self):
         return f"Name: {self.name}, Library Card Number: {self.library_card_number}, Fines: ${self.fines:.2f}"
 
