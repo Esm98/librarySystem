@@ -125,41 +125,25 @@ class ViewUsersWindow(QMainWindow):
         self.close()
 
 class UserDetailsWindow(QDialog):
-     def __init__(self,user_library_card_number,items,parent=None):
+    def __init__(self, user_library_card_number, items, parent=None):
         super().__init__(parent)
         self.setWindowTitle("User Details")
         layout = QVBoxLayout()
-        self.items = items
-        user_library_card_number = self.user_library_card_number
-        user = self.user
-
-        #with open('users.csv', newline='') as csvfile:
-           # reader = csv.reader(csvfile)
-            #next(reader)
-            #for row in reader:
-                #name, address, phone_number, library_card_number, age, checked_out_items_string = row
-                #if library_card_number == user_library_card_number:
-                    #checked_out_titles = checked_out_items_string.split(';')
-                    #checked_out_items = [item for item in items if item.title in checked_out_titles]
-                    #break
-        
+        checked_out_items = []
         with open('users.csv', newline='') as csvfile:
             reader = csv.reader(csvfile)
-            next(reader) # Skip the header
+            next(reader) # Skip the header row
             for row in reader:
                 name, address, phone_number, library_card_number, age, password, checked_out_items_string = row
-                checked_out_titles = checked_out_items_string.split(';')
-                checked_out_items = [item for item in self.items if item.title in checked_out_titles]
-                user = User.register(name, address, phone_number, library_card_number, int(age))
-                user.checked_out_items = checked_out_items
-                self.users[library_card_number] = user
-                self.passwords[library_card_number] = password
+                if library_card_number == user_library_card_number:
+                    checked_out_titles = checked_out_items_string.split(';')
+                    checked_out_items = [item for item in items if item.title in checked_out_titles]
+                    break
+            else: # No matching user found
+                print(f"User with library card number {user_library_card_number} not found.")
+                return
+            
         
-
-
-
-
-
         # Name
         name_label = QLabel(f"Name: {name}")
         layout.addWidget(name_label)
@@ -182,6 +166,7 @@ class UserDetailsWindow(QDialog):
         layout.addWidget(ok_button)
 
         self.setLayout(layout)
+
 
 
 
@@ -336,7 +321,7 @@ class LibraryApp(QMainWindow):
         self.items = []
 
         self.checkout_window = CheckoutWindow(self.items, self.users)
-
+    
 
         with open('users.csv', newline='') as csvfile:
             reader = csv.reader(csvfile)
@@ -386,7 +371,9 @@ class LibraryApp(QMainWindow):
         self.checkout_button = QPushButton("Checkout Item", self)
         self.checkout_button.clicked.connect(self.open_checkout_window)
 
-        
+        self.view_users_details_button = QPushButton("View user details", self)
+        self.view_users_details_button.clicked.connect(self.view_user_details)
+
         layout.addWidget(self.register_button)
 
         
@@ -400,11 +387,20 @@ class LibraryApp(QMainWindow):
 
         layout.addWidget(self.checkout_button)
 
+        layout.addWidget(self.view_users_details_button)
+
         container = QWidget()  # Create a container widget
         container.setLayout(layout)  # Set the layout of the container widget
         self.setCentralWidget(container)  # Set the central widget of the main window
 
         self.show()
+
+
+    def view_user_details(self):
+        selected_library_card_number = self.select_user(self.user) # Replace with your method to get the selected user's library card number
+        items = self.items # Assuming this holds the list of Item objects
+        details_window = UserDetailsWindow(selected_library_card_number, items)
+        details_window.exec_()
 
     def select_user(self, user_id):
         self.user = self.users.get(user_id)
