@@ -74,10 +74,14 @@ class CheckoutWindow(QDialog):
             # Write the existing users
             for row in users[1:]:
                 if row[3] == str(user.library_card_number):  # Update the user with new checked-out items
-                    checked_out_items_string = user.get_checked_out_items_string()
-                    writer.writerow([row[0], row[1], row[2], row[3], row[4], row[5], checked_out_items_string])
+                    # Combine existing and new checked-out items
+                    existing_checked_out_items = row[6]
+                    new_checked_out_items = user.get_checked_out_items_string()
+                    combined_checked_out_items = existing_checked_out_items + ';' + new_checked_out_items
+                    writer.writerow([row[0], row[1], row[2], row[3], row[4], row[5], combined_checked_out_items])
                 else:
                     writer.writerow(row)
+
 
 
 
@@ -134,6 +138,7 @@ class UserDetailsWindow(QDialog):
         self.setWindowTitle("User Details")
         layout = QVBoxLayout()
         checked_out_items = []
+        checked_out_items = []
        
         with open('users.csv', newline='') as csvfile:
             reader = csv.reader(csvfile)
@@ -157,8 +162,8 @@ class UserDetailsWindow(QDialog):
             else: # No matching user found
                 print(f"User with library card number {user_library_card_number} not found.")
                 return
-            
-        
+         
+    
         # Name
         name_label = QLabel(f"Name: {name}")
         layout.addWidget(name_label)
@@ -174,8 +179,10 @@ class UserDetailsWindow(QDialog):
         for item in checked_out_items:
             checked_out_list.addItem(item.title)
             print(f"Checked out items: {item.title}")
-
+            
         layout.addWidget(checked_out_list)
+
+        
 
         # OK Button
         ok_button = QPushButton("OK", self)
